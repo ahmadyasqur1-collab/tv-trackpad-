@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="id"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0e1117">
+<title>TV Trackpad</title>
+<style>
+:root{
+  --bg:#0e1117; --pad:#151923; --edge:#262d3c; --key:#1b202b; --key-hi:#252c3b;
+  --text:#e9ebf2; --mute:#8a92a6; --acc:#9b8cff; --ok:#46d39a; --bad:#ff6b6b; --warn:#f5b84b;
+  --font:ui-rounded,"SF Pro Rounded",-apple-system,"Segoe UI",Roboto,system-ui,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+html{height:100%;background:var(--bg);overscroll-behavior:none}
+body{
+  margin:0;position:fixed;left:0;top:0;width:100%;height:100%;overflow:hidden;
+  background:var(--bg);color:var(--text);font:15px/1.3 var(--font);
+  display:flex;flex-direction:column;gap:10px;
+  padding:max(10px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));
+}
+/* Mode paksa landscape saat HP masih tegak (iPhone / rotasi terkunci) */
+html.rot body{padding:10px 12px;transform:rotate(90deg) translateY(-100%);transform-origin:0 0}
+
+/* ---------- Atas ---------- */
+#top{display:flex;align-items:center;gap:10px;flex:none;height:40px}
+#status{display:flex;align-items:center;gap:9px;min-width:0;flex:1;height:40px;padding:0 14px;border-radius:20px;background:var(--pad);border:1px solid var(--edge);color:var(--mute);font-size:13.5px}
+#dot{width:9px;height:9px;border-radius:50%;background:var(--bad);flex:none}
+#dot.wait{background:var(--warn)}
+#dot.ok{background:var(--ok);box-shadow:0 0 10px 1px rgba(70,211,154,.55)}
+#msg{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ico{flex:none;width:40px;height:40px;padding:0;border-radius:20px;display:grid;place-items:center;background:var(--pad);border:1px solid var(--edge);color:var(--mute);transition:background .12s,color .12s,border-color .12s}
+.ico svg{width:20px;height:20px}
+.ico.act{color:var(--acc);border-color:var(--acc)}
+.ico:active{background:var(--key-hi);color:var(--text)}
+
+/* ---------- Keyboard ---------- */
+#kbbar{display:none;flex:none;gap:8px}
+#kbbar.show{display:flex}
+#kb{flex:1;min-width:0;height:44px;font:inherit;font-size:16px;padding:0 16px;border-radius:22px;border:1px solid var(--acc);background:var(--pad);color:var(--text);outline:none;-webkit-user-select:text;user-select:text}
+#kb::placeholder{color:var(--mute)}
+#kbbar .ico{width:56px;height:44px;border-radius:22px}
+
+/* ---------- Tengah ---------- */
+#main{flex:1;min-height:0;display:grid;grid-template-columns:84px 1fr 84px;gap:10px}
+.rail{display:flex;flex-direction:column;gap:10px;min-height:0}
+.key{
+  flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  font:inherit;font-size:12.5px;color:var(--text);background:var(--key);border:1px solid var(--edge);border-radius:22px;padding:0;
+  transition:background .1s,transform .1s,border-color .1s
+}
+.key svg{width:28px;height:28px}
+.key span{color:var(--mute)}
+.key:active{background:var(--acc);border-color:var(--acc);color:#14112a;transform:scale(.97)}
+.key:active span{color:#14112a}
+
+/* Rocker volume: satu pil, tiga bagian */
+#rocker{flex:1;min-height:0;display:flex;flex-direction:column;border-radius:34px;background:var(--key);border:1px solid var(--edge);overflow:hidden}
+#rocker button{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font:inherit;font-size:11.5px;color:var(--text);background:transparent;border:0;border-radius:0;padding:0;transition:background .1s}
+#rocker button svg{width:26px;height:26px}
+#rocker button span{color:var(--mute)}
+#rocker button+button{border-top:1px solid var(--edge)}
+#rocker button:active{background:var(--acc);color:#14112a}
+#rocker button:active span{color:#14112a}
+#rocker #mute{flex:.8}
+#rocker #mute svg{width:22px;height:22px}
+
+/* Trackpad */
+#pad{
+  position:relative;min-width:0;min-height:0;border-radius:30px;overflow:hidden;touch-action:none;
+  background:
+    radial-gradient(circle at 50% 40%,rgba(155,140,255,.07),transparent 60%),
+    radial-gradient(circle,rgba(255,255,255,.07) 1px,transparent 1.5px) 0 0/24px 24px,
+    var(--pad);
+  border:1px solid var(--edge);transition:border-color .15s,box-shadow .15s
+}
+#pad.on{border-color:var(--acc);box-shadow:inset 0 0 40px rgba(155,140,255,.12)}
+#hint{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px;text-align:center;color:var(--mute);font-size:13.5px;pointer-events:none;transition:opacity .25s}
+#hint b{display:block;color:var(--text);font-weight:600;font-size:15px;margin-bottom:2px}
+#pad.on #hint{opacity:0}
+#fingers{position:absolute;left:16px;bottom:12px;font-size:13px;color:var(--acc);pointer-events:none}
+#toast{position:absolute;left:50%;top:14px;transform:translate(-50%,-8px);padding:7px 14px;border-radius:16px;background:var(--key-hi);color:var(--text);font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;white-space:nowrap}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* cahaya yang mengikuti jari */
+#glow{position:absolute;left:0;top:0;width:90px;height:90px;margin:-45px 0 0 -45px;border-radius:50%;pointer-events:none;opacity:0;
+  background:radial-gradient(circle,rgba(155,140,255,.38),rgba(155,140,255,0) 68%);transition:opacity .15s;z-index:5;will-change:transform}
+#glow.on{opacity:1}
+
+
+/* ---------- Setup ---------- */
+#setup{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;background:rgba(8,10,15,.86);padding:10px}
+#setup.show{display:flex}
+#card{width:min(560px,100%);max-height:100%;overflow:auto;background:var(--pad);border:1px solid var(--edge);border-radius:22px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+#card .row{display:flex;align-items:center;gap:8px}
+#card h3{margin:0;font-size:16px;flex:1}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:inherit;font-size:12.5px;padding:7px 12px;border-radius:16px;border:1px solid var(--edge);background:var(--key);color:var(--mute)}
+.chip.sel{border-color:var(--acc);color:var(--text);background:var(--key-hi)}
+.btn{font:inherit;font-size:14px;padding:0 16px;height:40px;border-radius:20px;border:1px solid var(--edge);background:var(--key);color:var(--text);white-space:nowrap}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#14112a;font-weight:600}
+.btn:active{opacity:.75}
+.inp{flex:1;min-width:0;height:40px;font:inherit;font-size:15px;padding:0 14px;border-radius:20px;border:1px solid var(--edge);background:var(--bg);color:var(--text);outline:none;-webkit-user-select:text;user-select:text}
+.inp:focus{border-color:var(--acc)}
+#found{display:flex;flex-direction:column;gap:6px;max-height:110px;overflow:auto}
+.tv{display:flex;justify-content:space-between;gap:10px;text-align:left;font:inherit;font-size:13.5px;padding:9px 14px;border-radius:14px;border:1px solid var(--edge);background:var(--key);color:var(--text)}
+.tv small{color:var(--mute);font-size:12px}
+.sub{font-size:12px;color:var(--mute)}
+#pinbox{display:none;flex-direction:column;gap:6px;padding:10px;border:1px solid var(--acc);border-radius:16px}
+#pinbox.show{display:flex}
+.lnk{font:inherit;font-size:12.5px;color:var(--mute);background:none;border:0;text-decoration:underline;padding:4px;text-align:left}
+
+@media (max-height:340px){
+  body{gap:6px;padding-top:max(6px,env(safe-area-inset-top));padding-bottom:max(6px,env(safe-area-inset-bottom))}
+  #main{grid-template-columns:72px 1fr 72px;gap:8px}
+  .key svg{width:24px;height:24px}.key{border-radius:18px}
+  #top{height:34px}#status,.ico{height:34px}.ico{width:34px;border-radius:17px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head><body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v8.5a1 1 0 0 1-1 1h-4.5V14h-5v6.5H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+    <symbol id="i-mute" viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-kb" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M6.5 10h.01M10 10h.01M14 10h.01M17.5 10h.01M7.5 14h9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-scroll" viewBox="0 0 24 24"><path d="M12 4v16M8 8l4-4 4 4M8 16l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-full" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-tv" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 20.5h8M12 17v3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-bs" viewBox="0 0 24 24"><path d="M9 6h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-6-6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12.5 9.5l5 5M17.5 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-enter" viewBox="0 0 24 24"><path d="M19 5v7a2 2 0 0 1-2 2H5M9 10l-4 4 4 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </defs>
+</svg>
+
+<div id="top">
+  <div id="status"><div id="dot" class="wait"></div><div id="msg">Menyambung ke server...</div></div>
+  <button class="ico" id="inv" aria-label="Balik arah scroll"><svg><use href="#i-scroll"/></svg></button>
+  <button class="ico" id="kbtn" aria-label="Keyboard"><svg><use href="#i-kb"/></svg></button>
+  <button class="ico" id="cfg" aria-label="Pilih TV"><svg><use href="#i-tv"/></svg></button>
+</div>
+
+<div id="kbbar">
+  <input id="kb" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="send" placeholder="Ketik di sini, teks muncul di TV">
+  <button class="ico" id="bs" aria-label="Hapus"><svg><use href="#i-bs"/></svg></button>
+  <button class="ico" id="en" aria-label="Enter"><svg><use href="#i-enter"/></svg></button>
+</div>
+
+<div id="main">
+  <div class="rail">
+    <button class="key" data-k="BACK"><svg><use href="#i-back"/></svg><span>Kembali</span></button>
+    <button class="key" data-k="HOME"><svg><use href="#i-home"/></svg><span>Home</span></button>
+  </div>
+
+  <div id="pad">
+    <div id="hint">
+      <div><b>Geser 1 jari untuk gerakkan kursor</b>Ketuk sekali untuk klik</div>
+      <div><b>Geser 2 jari untuk scroll</b>Ketuk 2 jari untuk kembali</div>
+      <div><b>Geser 3 jari untuk seret</b>Jari ditahan sampai dilepas</div>
+    </div>
+    <div id="fingers"></div>
+    <div id="toast"></div>
+  </div>
+
+  <div class="rail">
+    <div id="rocker">
+      <button data-k="VOLUMEUP" aria-label="Volume naik"><svg><use href="#i-plus"/></svg><span>Vol</span></button>
+      <button data-k="MUTE" id="mute" aria-label="Mute"><svg><use href="#i-mute"/></svg></button>
+      <button data-k="VOLUMEDOWN" aria-label="Volume turun"><svg><use href="#i-minus"/></svg><span>Vol</span></button>
+    </div>
+  </div>
+</div>
+<div id="glow"></div>
+
+<div id="setup"><div id="card">
+  <div class="row"><h3>Hubungkan ke TV</h3><button class="ico" id="sx" aria-label="Tutup"><svg><use href="#i-plus" style="transform:rotate(45deg);transform-origin:center"/></svg></button></div>
+  <div class="chips" id="brands">
+    <button class="chip" data-b="lg">LG webOS</button>
+    <button class="chip" data-b="androidtv">Android / Google TV (TCL, Sony, Xiaomi)</button>
+    <button class="chip" data-b="roku">Roku TV (TCL Roku)</button>
+    <button class="chip" data-b="samsung">Samsung</button>
+  </div>
+  <div class="row"><button class="btn pri" id="scanbtn">Cari TV otomatis</button><span class="sub" id="scansub"></span></div>
+  <div id="found"></div>
+  <div class="row"><input class="inp" id="ip" inputmode="decimal" autocomplete="off" placeholder="IP manual, contoh 192.168.1.20"><button class="btn" id="go">Sambung</button></div>
+  <div id="pinbox">
+    <div class="sub">Kode 6 karakter sedang tampil di layar TV. Masukkan di sini:</div>
+    <div class="row"><input class="inp" id="pin" maxlength="6" autocomplete="off" autocapitalize="characters" placeholder="contoh A1B2C3"><button class="btn pri" id="pinok">Kirim</button></div>
+  </div>
+  <button class="lnk" id="forget">Pasangkan ulang (hapus izin tersimpan)</button>
+</div></div>
+
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var ws, pad = $('pad'), fingers = $('fingers'), dot = $('dot'), msg = $('msg'), glow = $('glow'), toastEl = $('toast');
+var scrollSign = 1;
+try { scrollSign = localStorage.getItem('scrollSign') === '-1' ? -1 : 1; } catch (e) {}
+$('inv').classList.toggle('act', scrollSign === -1);
+
+/* ---------- Landscape ---------- */
+var rot = false;
+function layout() {
+  var portrait = window.innerHeight > window.innerWidth;
+  var de = document.documentElement;
+  if (portrait) {
+    rot = true; de.classList.add('rot');
+    document.body.style.width = window.innerHeight + 'px';
+    document.body.style.height = window.innerWidth + 'px';
+  } else {
+    rot = false; de.classList.remove('rot');
+    document.body.style.width = ''; document.body.style.height = '';
+  }
+}
+window.addEventListener('resize', layout);
+window.addEventListener('orientationchange', function () { setTimeout(layout, 120); });
+layout();
+
+/* ---------- Koneksi (lewat bridge native Android) ---------- */
+var hasNative = typeof Android !== 'undefined';
+var brand = 'lg';
+function send(o) { if (hasNative) Android.send(JSON.stringify(o)); }
+function buzz(n) { try { if (navigator.vibrate) navigator.vibrate(n || 8); } catch (e) {} }
+var toastT;
+function toast(t) { toastEl.textContent = t; toastEl.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(function () { toastEl.classList.remove('show'); }, 1600); }
+
+/* ---------- Trackpad ---------- */
+/* koordinat jari dalam sumbu layar landscape (dipetakan bila HP masih tegak) */
+function pt(t) { return rot ? { x: t.clientY, y: window.innerWidth - t.clientX } : { x: t.clientX, y: t.clientY }; }
+function avg(e) {
+  var x = 0, y = 0, n = e.touches.length;
+  for (var i = 0; i < n; i++) { var p = pt(e.touches[i]); x += p.x; y += p.y; }
+  return { x: x / n, y: y / n };
+}
+function moveGlow(c) { glow.style.transform = 'translate(' + c.x + 'px,' + c.y + 'px)'; }
+
+var g = null;
+pad.addEventListener('touchstart', function (e) {
+  e.preventDefault();
+  var n = e.touches.length, c = avg(e);
+  if (!g) g = { t0: Date.now(), max: n, moved: 0, drag: false, locked: false, ax: 0, ay: 0 };
+  g.max = Math.max(g.max, n); g.x = c.x; g.y = c.y; g.ax = 0; g.ay = 0;
+  if (n >= 3 && !g.locked) { g.drag = true; send({ t: 'move', dx: 0, dy: 0, down: 1 }); buzz(14); }
+  pad.classList.add('on'); glow.classList.add('on'); moveGlow(c);
+  fingers.textContent = n + ' jari';
+}, { passive: false });
+
+pad.addEventListener('touchmove', function (e) {
+  e.preventDefault();
+  if (!g) return;
+  var n = e.touches.length, c = avg(e), dx = c.x - g.x, dy = c.y - g.y;
+  g.x = c.x; g.y = c.y; g.moved += Math.abs(dx) + Math.abs(dy);
+  moveGlow(c);
+  if (g.locked) return;
+  if (g.drag && n < 3) { send({ t: 'move', dx: 0, dy: 0, down: 0 }); g.drag = false; g.locked = true; return; }
+  if (n >= 3) {
+    var k = 1.4 + Math.min(Math.hypot(dx, dy) / 8, 2.5);
+    g.ax += dx * k; g.ay += dy * k;
+    var sx = Math.trunc(g.ax), sy = Math.trunc(g.ay);
+    if (sx || sy) { g.ax -= sx; g.ay -= sy; send({ t: 'move', dx: sx, dy: sy, down: 1 }); }
+  } else if (n === 2) {
+    g.ay += dy * 2 * scrollSign;
+    var s = Math.trunc(g.ay);
+    if (s) { g.ay -= s; send({ t: 'scroll', dx: 0, dy: s }); }
+  } else if (n === 1) {
+    var k2 = 1.4 + Math.min(Math.hypot(dx, dy) / 8, 2.5);
+    g.ax += dx * k2; g.ay += dy * k2;
+    var mx = Math.trunc(g.ax), my = Math.trunc(g.ay);
+    if (mx || my) { g.ax -= mx; g.ay -= my; send({ t: 'move', dx: mx, dy: my, down: 0 }); }
+  }
+}, { passive: false });
+
+function endTouch(e) {
+  e.preventDefault();
+  if (!g) return;
+  if (e.touches.length > 0) { var c = avg(e); g.x = c.x; g.y = c.y; g.ax = 0; g.ay = 0; fingers.textContent = e.touches.length + ' jari'; return; }
+  if (g.drag) send({ t: 'move', dx: 0, dy: 0, down: 0 });
+  else if (!g.locked && Date.now() - g.t0 < 280 && g.moved < 12) {
+    if (g.max === 1) { send({ t: 'tap' }); buzz(8); }
+    else if (g.max === 2) { send({ t: 'key', name: 'BACK' }); buzz(8); }
+  }
+  g = null; pad.classList.remove('on'); glow.classList.remove('on'); fingers.textContent = '';
+ 
+}
+pad.addEventListener('touchend', endTouch, { passive: false });
+pad.addEventListener('touchcancel', endTouch, { passive: false });
+
+/* ---------- Tombol ---------- */
+document.querySelectorAll('[data-k]').forEach(function (b) {
+  b.addEventListener('click', function () { send({ t: 'key', name: b.getAttribute('data-k') }); buzz(10); });
+});
+$('inv').addEventListener('click', function () {
+  scrollSign = -scrollSign;
+  try { localStorage.setItem('scrollSign', String(scrollSign)); } catch (e) {}
+  $('inv').classList.toggle('act', scrollSign === -1);
+  toast(scrollSign === -1 ? 'Scroll dibalik' : 'Scroll normal');
+});
+
+/* ---------- Keyboard ---------- */
+var kb = $('kb'), kbbar = $('kbbar'), last = '';
+$('kbtn').addEventListener('click', function () {
+  var on = kbbar.classList.toggle('show');
+  $('kbtn').classList.toggle('act', on);
+  if (on) kb.focus(); else kb.blur();
+});
+kb.addEventListener('input', function () {
+  var v = kb.value, i = 0;
+  while (i < last.length && i < v.length && last[i] === v[i]) i++;
+  var del = last.length - i;
+  if (del > 0) send({ t: 'del', count: del });
+  var add = v.slice(i);
+  if (add) send({ t: 'text', text: add });
+  last = v;
+});
+kb.addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') { e.preventDefault(); send({ t: 'enter' }); kb.value = ''; last = ''; }
+  else if (e.key === 'Backspace' && kb.value === '') send({ t: 'del', count: 1 });
+});
+$('bs').addEventListener('click', function () { send({ t: 'del', count: 1 }); if (kb.value) { kb.value = kb.value.slice(0, -1); last = kb.value; } kb.focus(); });
+$('en').addEventListener('click', function () { send({ t: 'enter' }); kb.value = ''; last = ''; kb.focus(); });
+
+/* ---------- Setup TV ---------- */
+var setupEl = $('setup'), foundEl = $('found'), ipEl = $('ip');
+var HINTS = {
+  lg: '<div><b>Geser 1 jari untuk gerakkan kursor</b>Ketuk sekali untuk klik</div><div><b>Geser 2 jari untuk scroll</b>Ketuk 2 jari untuk kembali</div><div><b>Geser 3 jari untuk seret</b>Jari ditahan sampai dilepas</div>',
+  dpad: '<div><b>Geser 1 jari = tombol panah</b>Ketuk sekali = OK / pilih</div><div><b>Geser 2 jari = atas / bawah</b>Ketuk 2 jari = kembali</div>'
+};
+function setBrand(b) {
+  brand = b;
+  document.querySelectorAll('#brands .chip').forEach(function (c) { c.classList.toggle('sel', c.getAttribute('data-b') === b); });
+  $('hint').innerHTML = b === 'lg' ? HINTS.lg : HINTS.dpad;
+}
+function openSetup() { setupEl.classList.add('show'); }
+function closeSetup() { setupEl.classList.remove('show'); $('pinbox').classList.remove('show'); try { document.activeElement.blur(); } catch (e) {} }
+var NAMES = { lg: 'LG webOS', androidtv: 'Android / Google TV', roku: 'Roku TV', samsung: 'Samsung' };
+function addFound(m) {
+  var b = document.createElement('button'); b.className = 'tv';
+  b.innerHTML = '<span></span><small></small>';
+  b.firstChild.textContent = m.name + ' • ' + m.ip;
+  b.lastChild.textContent = NAMES[m.brand] || m.brand;
+  b.onclick = function () { ipEl.value = m.ip; setBrand(m.brand); doConnect(); };
+  foundEl.appendChild(b);
+}
+function doConnect() {
+  var v = ipEl.value.trim();
+  if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(v)) { toast('IP tidak valid'); return; }
+  if (hasNative) Android.connect(brand, v);
+  dot.className = 'wait'; msg.textContent = 'Menghubungkan...';
+  if (brand === 'androidtv') { /* PIN diminta native bila perlu */ } else closeSetup();
+}
+function doScan() { foundEl.innerHTML = ''; if (hasNative) Android.scan(); }
+window.onNative = function (m) {
+  if (m.t === 'status') {
+    dot.className = m.ok ? 'ok' : 'wait'; msg.textContent = m.msg;
+    if (m.ok) { closeSetup(); if (brand !== 'lg') toast('Mode panah: geser = arah, ketuk = OK'); }
+  } else if (m.t === 'brand') { setBrand(m.brand); }
+  else if (m.t === 'needsetup') { openSetup(); doScan(); }
+  else if (m.t === 'scanStart') { $('scanbtn').disabled = true; $('scansub').textContent = 'Mencari...'; }
+  else if (m.t === 'found') { addFound(m); }
+  else if (m.t === 'scanDone') { $('scanbtn').disabled = false; $('scansub').textContent = foundEl.children.length ? 'Ketuk TV untuk menyambung' : 'Tidak ketemu, isi IP manual'; }
+  else if (m.t === 'askpin') { openSetup(); $('pinbox').classList.add('show'); $('pin').value = ''; $('pin').focus(); }
+};
+document.querySelectorAll('#brands .chip').forEach(function (c) { c.addEventListener('click', function () { setBrand(c.getAttribute('data-b')); }); });
+$('cfg').addEventListener('click', openSetup);
+$('status').addEventListener('click', openSetup);
+$('sx').addEventListener('click', closeSetup);
+$('scanbtn').addEventListener('click', doScan);
+$('go').addEventListener('click', doConnect);
+$('pinok').addEventListener('click', function () { var p = $('pin').value.trim(); if (hasNative) Android.pin(p); $('pinbox').classList.remove('show'); closeSetup(); });
+$('forget').addEventListener('click', function () { if (hasNative) Android.forget(); toast('Izin dihapus, menyambung ulang'); closeSetup(); });
+if (hasNative) {
+  try { var st = JSON.parse(Android.state()); ipEl.value = st.ip || ''; setBrand(st.brand || 'lg'); } catch (e) { setBrand('lg'); }
+  Android.ready();
+} else { setBrand('lg'); msg.textContent = 'Buka lewat aplikasi Android'; }
+</script></body></html>
